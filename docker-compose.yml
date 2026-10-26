@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: asset-tracker-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data      # data survives container restarts
+    ports:
+      - "5432:5432"                           # optional: lets you run the app from VS Code too
+    networks:
+      - asset-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: asset-tracker-app
+    depends_on:
+      postgres:
+        condition: service_healthy            # wait until the DB accepts connections
+    ports:
+      - "8080:8080"
+    environment:
+      # "postgres" is the service name -> Docker's network resolves it to the DB container
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    networks:
+      - asset-net
+
+volumes:
+  pgdata:
+
+networks:
+  asset-net:
+    driver: bridge
